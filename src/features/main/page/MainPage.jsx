@@ -21,15 +21,19 @@ const MainPage = () => {
   const [showChatDetails, setShowChatDetails] = useState(true);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [showAddPopup, setShowAddPopup] = useState(false);
 
-// Add this handler function
-const handleFileChange = (e) => {
-  const file = e.target.files[0];
-  if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) {
-    setSelectedFile(file);
-    // Handle your file upload logic here
-  }
-};
+  // Add this handler function
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (
+      file &&
+      (file.type.startsWith("image/") || file.type.startsWith("video/"))
+    ) {
+      setSelectedFile(file);
+      // Handle your file upload logic here
+    }
+  };
   const onEmojiClick = (emojiObject) => {
     setMessage((prevMessage) => prevMessage + emojiObject.emoji);
   };
@@ -92,55 +96,108 @@ const handleFileChange = (e) => {
           {/* Header with Add Button */}
           <div className="p-4 flex justify-between items-center">
             <h2 className="text-xl font-bold text-gray-800">Chats</h2>
-            <button className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">
+            <button
+              onClick={() => setShowAddPopup(true)}
+              className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+            >
               <BiPlus size={14} />
             </button>
           </div>
+          {/* Content that will be blurred */}
+          <div
+            className={`flex-1 flex flex-col transition-all duration-300 ${
+              showAddPopup ? "blur-sm" : ""
+            }`}
+          >
+            {/* Search Bar */}
+            <div className="px-4 py-3 border-b">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search chats..."
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:border-blue-500"
+                />
+                <BiSearch
+                  className="absolute left-3 top-3 text-gray-400"
+                  size={20}
+                />
+              </div>
+            </div>
 
-          {/* Search Bar */}
-          <div className="px-4 py-3 border-b">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search chats..."
-                className="w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:border-blue-500"
-              />
-              <BiSearch
-                className="absolute left-3 top-3 text-gray-400"
-                size={20}
-              />
+            {/* Rest of the chat list remains the same */}
+            <div className="flex-1 overflow-y-auto">
+              {chatList.map((chat) => (
+                <div
+                  key={chat.id}
+                  onClick={() => setSelectedChat(chat)}
+                  className={`p-4 border-b hover:bg-gray-50 cursor-pointer ${
+                    selectedChat?.id === chat.id ? "bg-blue-50" : ""
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 rounded-full bg-gray-300"></div>
+                    <div className="flex-1">
+                      <div className="flex justify-between">
+                        <h3 className="font-semibold">{chat.name}</h3>
+                        <span className="text-sm text-gray-500">
+                          {chat.time}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 truncate">
+                        {chat.lastMessage}
+                      </p>
+                    </div>
+                    {chat.unread > 0 && (
+                      <span className="bg-blue-600 text-white rounded-full px-2 py-1 text-xs">
+                        {chat.unread}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-
-          {/* Rest of the chat list remains the same */}
-          <div className="flex-1 overflow-y-auto">
-            {chatList.map((chat) => (
-              <div
-                key={chat.id}
-                onClick={() => setSelectedChat(chat)}
-                className={`p-4 border-b hover:bg-gray-50 cursor-pointer ${
-                  selectedChat?.id === chat.id ? "bg-blue-50" : ""
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 rounded-full bg-gray-300"></div>
-                  <div className="flex-1">
-                    <div className="flex justify-between">
-                      <h3 className="font-semibold">{chat.name}</h3>
-                      <span className="text-sm text-gray-500">{chat.time}</span>
+          {/* Add New Chat Popup */}
+          <div
+            className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-xl transform transition-transform duration-300 ease-in-out ${
+              showAddPopup ? "translate-y-0" : "translate-y-full"
+            }`}
+          >
+            <div className="p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Add New Chat</h3>
+                <button
+                  onClick={() => setShowAddPopup(false)}
+                  className="p-1 hover:bg-gray-100 rounded-full"
+                >
+                  <HiX size={20} className="text-gray-500" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
+                />
+                <div className="max-h-60 overflow-y-auto">
+                  {/* Sample users - Replace with actual user list */}
+                  {[1, 2, 3].map((user) => (
+                    <div
+                      key={user}
+                      className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gray-300"></div>
+                      <div>
+                        <h4 className="font-medium">User {user}</h4>
+                        <p className="text-sm text-gray-500">
+                          user{user}@example.com
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600 truncate">
-                      {chat.lastMessage}
-                    </p>
-                  </div>
-                  {chat.unread > 0 && (
-                    <span className="bg-blue-600 text-white rounded-full px-2 py-1 text-xs">
-                      {chat.unread}
-                    </span>
-                  )}
+                  ))}
                 </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </div>
