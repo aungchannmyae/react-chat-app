@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { HiMenu, HiX } from "react-icons/hi";
 import {
   BiSearch,
@@ -8,13 +8,21 @@ import {
 } from "react-icons/bi";
 import { FiLogOut } from "react-icons/fi";
 import { BiPlus } from "react-icons/bi";
-import { NavLink } from "react-router-dom";
-// Add to your imports at the top
+import { NavLink, useNavigate } from "react-router-dom";
 import EmojiPicker from "emoji-picker-react";
 import { BsEmojiSmile } from "react-icons/bs";
 import { IoImageOutline } from "react-icons/io5";
+import { onAuthStateChanged } from "firebase/auth";
+import useUserStore from "../../../lib/userStore";
+import { auth, db } from "../../../lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import AddPopUp from "../components/list/AddPopUp";
+import ChatSection from "../components/list/ChatSection";
 
 const MainPage = () => {
+  const { currentUser, isLoading, fetchUserInfo } = useUserStore();
+  const navigation = useNavigate();
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedChat, setSelectedChat] = useState(null);
   const [message, setMessage] = useState("");
@@ -22,191 +30,125 @@ const MainPage = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [showAddPopup, setShowAddPopup] = useState(false);
+  const [chats, setChats] = useState([]);
 
-  // Add this handler function
-  const handleFileChange = (e) => {
+  const handleFileChange = useCallback((e) => {
     const file = e.target.files[0];
     if (
       file &&
       (file.type.startsWith("image/") || file.type.startsWith("video/"))
     ) {
       setSelectedFile(file);
-      // Handle your file upload logic here
     }
-  };
-  const onEmojiClick = (emojiObject) => {
+  }, []);
+
+  const onEmojiClick = useCallback((emojiObject) => {
     setMessage((prevMessage) => prevMessage + emojiObject.emoji);
-  };
-  // Sample data - Replace with your actual data
-  const chatList = [
-    {
-      id: 1,
-      name: "John Doe",
-      lastMessage: "Hey, how are you?",
-      time: "10:30 AM",
-      unread: 2,
-    },
-    {
-      id: 2,
-      name: "Jane Smith",
-      lastMessage: "See you tomorrow!",
-      time: "9:45 AM",
-      unread: 0,
-    },
-  ];
+  }, []);
 
-  // Close sidebar when clicking outside on mobile
+  const handleClickOutside = useCallback((e) => {
+    if (
+      window.innerWidth < 768 &&
+      !e.target.closest(".sidebar") &&
+      !e.target.closest(".menu-button")
+    ) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (
-        window.innerWidth < 768 &&
-        !e.target.closest(".sidebar") &&
-        !e.target.closest(".menu-button")
-      ) {
-        setIsSidebarOpen(false);
+    const unSub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        fetchUserInfo(user?.uid);
+      } else {
+        navigation("/register");
+        return null;
       }
+    });
+    return () => {
+      unSub();
     };
+  }, [fetchUserInfo]);
 
+  useEffect(() => {
+    if (!isLoading && currentUser) {
+      const unSub = onSnapshot(
+        doc(db, "userchats", currentUser.id),
+        async (res) => {
+          const items = res.data().chats;
+          const promises = items.map(async (item) => {
+            const userDocRef = doc(db, "users", item.receiverId);
+            const userDocSnap = await getDoc(userDocRef);
+            return userDocSnap.data();
+          });
+          const chatData = await Promise.all(promises);
+          setChats(chatData.sort((a, b) => b.updatedAt - a.updatedAt));
+        }
+      );
+      return () => {
+        unSub();
+      };
+    }
+  }, [isLoading, currentUser]);
+
+  useEffect(() => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [handleClickOutside]);
+
+  if (isLoading) return <div>Loading...</div>;
+
   const handleLogout = () => {
+    navigation("/login");
+    auth.signOut();
     // Add your logout logic here
   };
+
   const handleBlock = () => {
     // Add your block user logic here
   };
+
   return (
     <div className="h-screen p-2 flex gap-2 overflow-hidden bg-stone-300">
-      {/* Mobile menu button */}
       <button
         className="md:hidden fixed top-4 left-4 z-50 menu-button p-2 rounded-md bg-blue-600 text-white"
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
       >
         {isSidebarOpen ? <HiX size={24} /> : <HiMenu size={24} />}
       </button>
-
-      {/* Sidebar - Chat List */}
       <div
-        className={` lg:rounded-md sidebar fixed md:static w-80 h-full bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
+        className={`overflow-hidden lg:rounded-md sidebar fixed md:static w-80 h-full bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0 z-40`}
       >
+        <button
+          className="md:hidden fixed top-4 left-4 z-50 menu-button p-2 rounded-md bg-blue-600 text-white"
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        >
+          {isSidebarOpen ? <HiX size={24} /> : <HiMenu size={24} />}
+        </button>
         <div className="h-full flex flex-col">
-          {/* Header with Add Button */}
-          <div className="p-4 flex justify-between items-center">
-            <h2 className="text-xl font-bold text-gray-800">Chats</h2>
-            <button
-              onClick={() => setShowAddPopup(true)}
-              className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-            >
-              <BiPlus size={14} />
-            </button>
-          </div>
-          {/* Content that will be blurred */}
-          <div
-            className={`flex-1 flex flex-col transition-all duration-300 ${
-              showAddPopup ? "blur-sm" : ""
-            }`}
-          >
-            {/* Search Bar */}
-            <div className="px-4 py-3 border-b">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search chats..."
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:border-blue-500"
-                />
-                <BiSearch
-                  className="absolute left-3 top-3 text-gray-400"
-                  size={20}
-                />
-              </div>
-            </div>
-
-            {/* Rest of the chat list remains the same */}
-            <div className="flex-1 overflow-y-auto">
-              {chatList.map((chat) => (
-                <div
-                  key={chat.id}
-                  onClick={() => setSelectedChat(chat)}
-                  className={`p-4 border-b hover:bg-gray-50 cursor-pointer ${
-                    selectedChat?.id === chat.id ? "bg-blue-50" : ""
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 rounded-full bg-gray-300"></div>
-                    <div className="flex-1">
-                      <div className="flex justify-between">
-                        <h3 className="font-semibold">{chat.name}</h3>
-                        <span className="text-sm text-gray-500">
-                          {chat.time}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 truncate">
-                        {chat.lastMessage}
-                      </p>
-                    </div>
-                    {chat.unread > 0 && (
-                      <span className="bg-blue-600 text-white rounded-full px-2 py-1 text-xs">
-                        {chat.unread}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          {/* Add New Chat Popup */}
+          <ChatSection
+            currentUser={currentUser}
+            selectedChat={selectedChat}
+            setSelectedChat={setSelectedChat}
+            showAddPopup={showAddPopup}
+            setShowAddPopup={setShowAddPopup}
+            chats={chats}
+          />
           <div
             className={`absolute bottom-0 left-0 right-0 bg-white rounded-t-xl transform transition-transform duration-300 ease-in-out ${
               showAddPopup ? "translate-y-0" : "translate-y-full"
             }`}
           >
-            <div className="p-4">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Add New Chat</h3>
-                <button
-                  onClick={() => setShowAddPopup(false)}
-                  className="p-1 hover:bg-gray-100 rounded-full"
-                >
-                  <HiX size={20} className="text-gray-500" />
-                </button>
-              </div>
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Search users..."
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"
-                />
-                <div className="max-h-60 overflow-y-auto">
-                  {/* Sample users - Replace with actual user list */}
-                  {[1, 2, 3].map((user) => (
-                    <div
-                      key={user}
-                      className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-gray-300"></div>
-                      <div>
-                        <h4 className="font-medium">User {user}</h4>
-                        <p className="text-sm text-gray-500">
-                          user{user}@example.com
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <AddPopUp setShowAddPopup={setShowAddPopup} />
           </div>
         </div>
       </div>
 
-      {/* Main Chat Section */}
-      <div className=" md:rounded-md overflow-hidden flex-1 flex flex-col bg-white">
+      <div className="md:rounded-md overflow-hidden flex-1 flex flex-col bg-white">
         {selectedChat ? (
           <>
-            {/* Chat Header */}
             <div className="p-4 border-b flex justify-between items-center">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-full bg-gray-300"></div>
@@ -219,10 +161,7 @@ const MainPage = () => {
                 <BiDotsVerticalRounded size={24} className="text-gray-600" />
               </button>
             </div>
-
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {/* Sample messages - Replace with actual messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
               <div className="flex justify-end">
                 <div className="bg-blue-600 text-white rounded-lg p-3 max-w-xs">
                   Hello! How are you?
@@ -233,9 +172,50 @@ const MainPage = () => {
                   I'm doing great, thanks!
                 </div>
               </div>
+              <div className="flex justify-end">
+                <div className="bg-blue-600 text-white rounded-lg p-3 max-w-xs">
+                  Hello! How are you?
+                </div>
+              </div>
+              <div className="flex justify-start">
+                <div className="bg-gray-200 rounded-lg p-3 max-w-xs">
+                  I'm doing great, thanks!
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <div className="bg-blue-600 text-white rounded-lg p-3 max-w-xs">
+                  Hello! How are you?
+                </div>
+              </div>
+              <div className="flex justify-start">
+                <div className="bg-gray-200 rounded-lg p-3 max-w-xs">
+                  Lorem ipsum dolor sit amet consectetur adipisicing elit.
+                  Expedita doloribus quaerat deserunt amet itaque quas corporis
+                  cupiditate eius porro soluta.
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <div className="max-w-sm rounded-lg overflow-hidden">
+                  <img
+                    src="/Sample.jpg"
+                    alt="Sample received image"
+                    className="rounded-lg"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <div className="bg-blue-600 text-white rounded-lg p-3 max-w-xs">
+                  Check out these photos!
+                </div>
+              </div>
+              <div className="flex justify-start">
+                <div className="bg-gray-200 rounded-lg p-3 max-w-xs">
+                  Lorem ipsum dolor sit amet consectetur adipisicing elit.
+                  Expedita doloribus quaerat deserunt amet itaque quas corporis
+                  cupiditate eius porro soluta.
+                </div>
+              </div>
             </div>
-
-            {/* Message Input */}
             <div className="p-4 bg-gray-100 relative">
               <div className="flex space-x-2">
                 <div className="relative flex space-x-2">
@@ -299,8 +279,7 @@ const MainPage = () => {
         )}
       </div>
 
-      {/* Chat Details Section - Modified for mobile responsiveness */}
-      <div className={`${showChatDetails ? "block" : "hidden"} lg:block w-80 `}>
+      <div className={`${showChatDetails ? "block" : "hidden"} lg:block w-80`}>
         {selectedChat && (
           <div className="h-full flex flex-col gap-2">
             <div className="flex-1 p-4 lg:rounded-md bg-white">
@@ -324,8 +303,6 @@ const MainPage = () => {
                 </div>
               </div>
             </div>
-
-            {/* Action Buttons */}
             <div className="p-4 lg:rounded-md bg-white space-y-2">
               <button
                 onClick={handleBlock}
@@ -334,14 +311,13 @@ const MainPage = () => {
                 <BiBlock size={20} />
                 <span>Block User</span>
               </button>
-              <NavLink
-                to={`/login`}
+              <button
                 onClick={handleLogout}
                 className="w-full flex items-center justify-center space-x-2 py-2 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 <FiLogOut size={20} />
                 <span>Logout</span>
-              </NavLink>
+              </button>
             </div>
           </div>
         )}
