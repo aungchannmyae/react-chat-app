@@ -44,7 +44,7 @@ const ChatSection = ({
         <div className="flex-1 overflow-y-auto">
           {chats.map((chat) => (
             <div
-              key={chat.id}
+              key={chat.chatId}
               onClick={() => setSelectedChat(chat)}
               className={`p-4 border-b hover:bg-gray-50 cursor-pointer ${
                 selectedChat?.id === chat.id ? "bg-blue-50" : ""
@@ -54,7 +54,7 @@ const ChatSection = ({
                 <div className="w-12 h-12 rounded-full bg-gray-300"></div>
                 <div className="flex-1">
                   <div className="flex justify-between">
-                    <h3 className="font-semibold">{chat.name}</h3>
+                    <h3 className="font-semibold capitalize">{chat.user.username}</h3>
                     <span className="text-sm text-gray-500">{chat.time}</span>
                   </div>
                   <p className="text-sm text-gray-600 truncate">

@@ -2,10 +2,21 @@ import React, { useState } from "react";
 import { BiSearch } from "react-icons/bi";
 import { HiX } from "react-icons/hi";
 import { db } from "../../../../lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import {
+  arrayUnion,
+  collection,
+  doc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from "firebase/firestore";
+import useUserStore from "../../../../lib/userStore";
 
 const AddPopUp = ({ setShowAddPopup }) => {
   const [user, setUser] = useState(null);
+  const { currentUser } = useUserStore();
   const handleSearch = async (e) => {
     e.preventDefault();
 
@@ -22,11 +33,46 @@ const AddPopUp = ({ setShowAddPopup }) => {
       if (!querySnapshot.empty) {
         setUser(querySnapshot.docs[0].data());
       }
-      
     } catch (err) {
       console.log(err);
     }
     // Add your search logic here
+  };
+
+  const handleAddChat = async () => {
+    const chatRef = collection(db, "chats");
+    const userChatRef = collection(db, "userchats");
+
+    try {
+      const newChatRef = doc(chatRef);
+
+      await setDoc(newChatRef, {
+        createdAt: serverTimestamp(),
+        messages: [],
+      });
+
+      await setDoc(doc(userChatRef, user.id), {
+        chats: arrayUnion({
+          chatId: newChatRef.id,
+          lastMessage: "",
+          receiverId: currentUser.id,
+          updatedAt: Date.now(),
+        }),
+      });
+
+      await setDoc(doc(userChatRef, currentUser.id), {
+        chats: arrayUnion({
+          chatId: newChatRef.id,
+          lastMessage: "",
+          receiverId: user.id,
+          updatedAt: Date.now(),
+        }),
+      });
+    } catch (err) {
+      console.log(err);
+    }
+
+    // Add your add chat logic here
   };
 
   return (
@@ -59,6 +105,7 @@ const AddPopUp = ({ setShowAddPopup }) => {
           {user && (
             <div
               key={user}
+              onClick={handleAddChat}
               className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
             >
               <div className="w-10 h-10 rounded-full bg-gray-300"></div>

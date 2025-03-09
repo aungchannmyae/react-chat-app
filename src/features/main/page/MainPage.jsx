@@ -15,7 +15,7 @@ import { IoImageOutline } from "react-icons/io5";
 import { onAuthStateChanged } from "firebase/auth";
 import useUserStore from "../../../lib/userStore";
 import { auth, db } from "../../../lib/firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import AddPopUp from "../components/list/AddPopUp";
 import ChatSection from "../components/list/ChatSection";
 
@@ -77,9 +77,13 @@ const MainPage = () => {
         async (res) => {
           const items = res.data().chats;
           const promises = items.map(async (item) => {
+
             const userDocRef = doc(db, "users", item.receiverId);
+
             const userDocSnap = await getDoc(userDocRef);
-            return userDocSnap.data();
+
+            const user = userDocSnap.data();
+            return { ...item, user };
           });
           const chatData = await Promise.all(promises);
           setChats(chatData.sort((a, b) => b.updatedAt - a.updatedAt));
@@ -107,6 +111,8 @@ const MainPage = () => {
   const handleBlock = () => {
     // Add your block user logic here
   };
+
+  console.log(chats);
 
   return (
     <div className="h-screen p-2 flex gap-2 overflow-hidden bg-stone-300">
